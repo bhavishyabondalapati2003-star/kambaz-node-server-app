@@ -1,9 +1,9 @@
 import UsersDao from "./dao.js";
+import db from "../Database/index.js";
 
-export default function UserRoutes(app, db) {
-  const dao = UsersDao(db);
+export default function UserRoutes(app) {
+  const dao = UsersDao();
   
-  // Helper function to add enrolled courses to user
   const addEnrolledCourses = (user) => {
     const { enrollments } = db;
     const userEnrollments = enrollments
@@ -12,40 +12,77 @@ export default function UserRoutes(app, db) {
     return { ...user, enrolledCourses: userEnrollments };
   };
   
-  const createUser = (req, res) => { };
-  const deleteUser = (req, res) => { };
-  const findAllUsers = (req, res) => { };
-  const findUserById = (req, res) => { };
-  
-  const updateUser = (req, res) => {
-    const userId = req.params.userId;
-    const userUpdates = req.body;
-    dao.updateUser(userId, userUpdates);
-    let currentUser = dao.findUserById(userId);
-    currentUser = addEnrolledCourses(currentUser);
-    req.session["currentUser"] = currentUser;
-    res.json(currentUser);
+  const createUser = async (req, res) => {
+    const user = await dao.createUser(req.body);
+    const userObject = user.toObject ? user.toObject() : user;
+    res.json(userObject);
   };
   
-  const signup = (req, res) => {
-    const user = dao.findUserByUsername(req.body.username);
+  const deleteUser = async (req, res) => {
+    const status = await dao.deleteUser(req.params.userId);
+    res.json(status);
+  };
+  
+  const findAllUsers = async (req, res) => {
+    const { role, name } = req.query;
+    
+    if (role) {
+      const users = await dao.findUsersByRole(role);
+      const usersArray = users.map(u => u.toObject ? u.toObject() : u);
+      res.json(usersArray);
+      return;
+    }
+    
+    if (name) {
+      const users = await dao.findUsersByPartialName(name);
+      const usersArray = users.map(u => u.toObject ? u.toObject() : u);
+      res.json(usersArray);
+      return;
+    }
+    
+    const users = await dao.findAllUsers();
+    const usersArray = users.map(u => u.toObject ? u.toObject() : u);
+    res.json(usersArray);
+  };
+  
+  const findUserById = async (req, res) => {
+    const user = await dao.findUserById(req.params.userId);
+    const userObject = user.toObject ? user.toObject() : user;
+    res.json(userObject);
+  };
+  
+  const updateUser = async (req, res) => {
+    const userId = req.params.userId;
+    const userUpdates = req.body;
+    await dao.updateUser(userId, userUpdates);
+    let currentUser = await dao.findUserById(userId);
+    const userObject = currentUser.toObject ? currentUser.toObject() : currentUser;
+    const userWithCourses = addEnrolledCourses(userObject);
+    req.session["currentUser"] = userWithCourses;
+    res.json(userWithCourses);
+  };
+  
+  const signup = async (req, res) => {
+    const user = await dao.findUserByUsername(req.body.username);
     if (user) {
       res.status(400).json({ message: "Username already taken" });
       return;
     }
-    let currentUser = dao.createUser(req.body);
-    currentUser = addEnrolledCourses(currentUser);
-    req.session["currentUser"] = currentUser;
-    res.json(currentUser);
+    let currentUser = await dao.createUser(req.body);
+    const userObject = currentUser.toObject ? currentUser.toObject() : currentUser;
+    const userWithCourses = addEnrolledCourses(userObject);
+    req.session["currentUser"] = userWithCourses;
+    res.json(userWithCourses);
   };
   
-  const signin = (req, res) => {
+  const signin = async (req, res) => {
     const { username, password } = req.body;
-    let currentUser = dao.findUserByCredentials(username, password);
+    let currentUser = await dao.findUserByCredentials(username, password);
     if (currentUser) {
-      currentUser = addEnrolledCourses(currentUser); // ADD THIS LINE
-      req.session["currentUser"] = currentUser;
-      res.json(currentUser);
+      const userObject = currentUser.toObject ? currentUser.toObject() : currentUser;
+      const userWithCourses = addEnrolledCourses(userObject);
+      req.session["currentUser"] = userWithCourses;
+      res.json(userWithCourses);
     } else {
       res.status(401).json({ message: "Unable to login. Try again later." });
     }
@@ -62,8 +99,10 @@ export default function UserRoutes(app, db) {
       res.sendStatus(401);
       return;
     }
-    currentUser = addEnrolledCourses(currentUser); // ADD THIS LINE
-    res.json(currentUser);
+    // currentUser from session is already a plain object, but just in case:
+    const userObject = currentUser.toObject ? currentUser.toObject() : currentUser;
+    const userWithCourses = addEnrolledCourses(userObject);
+    res.json(userWithCourses);
   };
 
   const findUsersForCourse = (req, res) => {
