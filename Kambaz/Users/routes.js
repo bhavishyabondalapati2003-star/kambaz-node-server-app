@@ -52,16 +52,22 @@ export default function UserRoutes(app) {
   };
   
   const updateUser = async (req, res) => {
-    const userId = req.params.userId;
-    const userUpdates = req.body;
-    await dao.updateUser(userId, userUpdates);
-    let currentUser = await dao.findUserById(userId);
-    const userObject = currentUser.toObject ? currentUser.toObject() : currentUser;
-    const userWithCourses = addEnrolledCourses(userObject);
-    req.session["currentUser"] = userWithCourses;
-    res.json(userWithCourses);
-  };
+  const userId = req.params.userId;
+  const userUpdates = req.body;
+  await dao.updateUser(userId, userUpdates);
   
+  let updatedUser = await dao.findUserById(userId);
+  const userObject = updatedUser.toObject ? updatedUser.toObject() : updatedUser;
+  const userWithCourses = addEnrolledCourses(userObject);
+  
+  // Only update session if user is editing themselves
+  const currentUser = req.session["currentUser"];
+  if (currentUser && currentUser._id === userId) {
+    req.session["currentUser"] = userWithCourses;
+  }
+  
+  res.json(userWithCourses);
+};
   const signup = async (req, res) => {
     const user = await dao.findUserByUsername(req.body.username);
     if (user) {
