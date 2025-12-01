@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import mongoose from "mongoose";
 import session from "express-session";
 import Hello from "./Hello.js";
 import cors from "cors";
@@ -10,6 +11,9 @@ import CourseRoutes from "./Kambaz/Courses/routes.js";
 import ModulesRoutes from "./Kambaz/Modules/routes.js";
 import AssignmentsRoutes from "./Kambaz/Assignments/routes.js";
 import EnrollmentsRoutes from "./Kambaz/Enrollments/routes.js";
+
+const CONNECTION_STRING = process.env.DATABASE_CONNECTION_STRING || "mongodb://127.0.0.1:27017/kambaz";
+mongoose.connect(CONNECTION_STRING);
 
 const app = express();
 
@@ -24,6 +28,11 @@ const sessionOptions = {
   secret: process.env.SESSION_SECRET || "kambaz",
   resave: false,
   saveUninitialized: false,
+  cookie: {
+    sameSite: "lax",  // ← ADD THIS
+    httpOnly: true,   // ← ADD THIS
+    secure: false,    // ← ADD THIS (false for localhost)
+  }
 };
 
 if (process.env.SERVER_ENV !== "development") {
@@ -40,10 +49,10 @@ app.use(express.json());
 
 Lab5(app);
 Hello(app);
-UserRoutes(app, db);
-CourseRoutes(app, db);
-ModulesRoutes(app, db);
-AssignmentsRoutes(app, db);
+UserRoutes(app);
+CourseRoutes(app); 
+ModulesRoutes(app);
+AssignmentsRoutes(app);
 EnrollmentsRoutes(app, db);
 
 const PORT = process.env.PORT || 4000;

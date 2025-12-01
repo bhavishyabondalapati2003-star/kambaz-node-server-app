@@ -1,29 +1,75 @@
+import model from "./model.js";
 import { v4 as uuidv4 } from "uuid";
 
-export default function UsersDao(db) {
-  let { users } = db;
-  
+export default function UsersDao() {
   const createUser = (user) => {
     const newUser = { ...user, _id: uuidv4() };
-    users = [...users, newUser];
-    return newUser;
+    return model.create(newUser);
   };
   
-  const findAllUsers = () => users;
-  const findUserById = (userId) => users.find((user) => user._id === userId);
-  const findUserByUsername = (username) => users.find((user) => user.username === username);
-  const findUserByCredentials = (username, password) =>
-    users.find((user) => user.username === username && user.password === password);
-  const updateUser = (userId, user) => (users = users.map((u) => (u._id === userId ? user : u)));
-  const deleteUser = (userId) => (users = users.filter((u) => u._id !== userId));
+  const findAllUsers = () => model.find();
   
-  return {
+  const findUserById = (userId) => model.findById(userId);
+  
+  const findUserByUsername = (username) => 
+    model.findOne({ username: username });
+  
+  const findUserByCredentials = (username, password) => 
+    model.findOne({ username, password });
+  
+  const findUsersByRole = (role) => model.find({ role: role });
+  
+  const findUsersByPartialName = (partialName) => {
+    const trimmed = partialName.trim();
+    
+    // If single word, search firstName OR lastName
+    if (!trimmed.includes(' ')) {
+      const regex = new RegExp(trimmed, "i");
+      return model.find({
+        $or: [
+          { firstName: { $regex: regex } },
+          { lastName: { $regex: regex } }
+        ],
+      });
+    }
+    
+    // If multiple words, search firstName AND lastName
+    const words = trimmed.split(/\s+/);
+    const firstWord = new RegExp(words[0], "i");
+    const lastWord = new RegExp(words[words.length - 1], "i");
+    
+    return model.find({
+      $and: [
+        {
+          $or: [
+            { firstName: { $regex: firstWord } },
+            { lastName: { $regex: firstWord } }
+          ]
+        },
+        {
+          $or: [
+            { firstName: { $regex: lastWord } },
+            { lastName: { $regex: lastWord } }
+          ]
+        }
+      ]
+    });
+  };
+  
+  const updateUser = (userId, user) => 
+    model.updateOne({ _id: userId }, { $set: user });
+  
+  const deleteUser = (userId) => model.findByIdAndDelete(userId);
+  
+  return { 
     createUser, 
     findAllUsers, 
     findUserById, 
     findUserByUsername, 
     findUserByCredentials, 
+    findUsersByRole,
+    findUsersByPartialName,
     updateUser, 
-    deleteUser
+    deleteUser 
   };
 }
